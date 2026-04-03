@@ -1,0 +1,107 @@
+---
+sidebar_position: 1
+title: Endpoints
+---
+
+import {IconPackage, IconSettings, IconPalette, IconShuffle, IconPhoto, IconShoppingBag, IconCreditCard, IconLock} from '@tabler/icons-react';
+
+# API Reference
+
+Todos os endpoints da plataforma Labanana. Para testar ao vivo, use a documentacao interativa.
+
+:::tip API Interativa
+[Swagger UI](https://api.labanana.art/docs) -- teste endpoints direto no browser | [ReDoc](https://api.labanana.art/redoc) -- documentacao navegavel
+:::
+
+---
+
+## Catalogo (Admin)
+
+Endpoints para configurar o catalogo de produtos. Requer role `admin`.
+
+| Recurso | Endpoints | Descricao |
+|---|---|---|
+| **Product Types** | `POST/GET/PATCH/DELETE /products/types` | Categorias de produto |
+| **Assets** | `POST /products/types/{id}/assets`, `PATCH/DELETE /products/assets/{id}` | Caracteristicas de fabricacao |
+| **Options** | `POST /products/types/{id}/options`, `PATCH/DELETE /products/options/{id}` | Caracteristicas visuais |
+| **Variants** | `POST /products/types/{id}/variants`, `POST .../generate-variants` | Combinacoes de assets com custo |
+| **Templates** | `POST /products/types/{id}/templates`, upload via presign | Mockups para composicao |
+
+**Operacoes bulk:** Assets (`/bulk`), Variants (`/bulk`, `/generate-variants`, `PATCH .../bulk`, `DELETE .../bulk`)
+
+---
+
+## Seller
+
+Endpoints para sellers criarem e gerenciarem produtos. Requer autenticacao.
+
+| Recurso | Endpoints | Descricao |
+|---|---|---|
+| **Artworks** | `POST /uploads/artworks/presign`, `POST .../complete` | Upload de artes |
+| **Seller Products** | `POST/GET/PATCH/DELETE /seller-products/me` | Criar e gerenciar produtos |
+| **Variantes** | `POST /seller-products/me/{id}/variants` | Adicionar variantes com preco |
+| **Renders** | `POST /seller-products/me/{id}/render` | Gerar mockups com arte |
+| **Placements** | `GET/PUT /artworks/{id}/placements/{templateId}` | Posicionar arte no template |
+| **Preview** | `GET /seller-products/me/{id}/preview` | Pre-visualizar pagina publica |
+
+---
+
+## Publico (sem autenticacao)
+
+| Recurso | Endpoints | Descricao |
+|---|---|---|
+| **Loja** | `GET /stores/{slug}/products` | Listar produtos da loja |
+| **Produto** | `GET /stores/{slug}/products/{slug}` | Detalhe com SKUs, renders, definitions |
+| **Artwork** | `GET /artworks/public/{id}` | Detalhes publicos da arte |
+
+---
+
+## Auth
+
+| Recurso | Endpoint | Descricao |
+|---|---|---|
+| **Signup** | `POST /auth/signup` | Criar conta (retorna tokens) |
+| **Login** | `POST /auth/login` | Autenticar (retorna tokens) |
+| **Refresh** | `POST /auth/refresh` | Renovar tokens |
+| **Me** | `GET /auth/me` | Dados do usuario logado |
+| **Senha** | `POST /auth/change-password` | Alterar senha |
+| **Reset** | `POST /auth/password/forgot`, `POST .../reset` | Recuperar senha |
+
+Detalhes completos: [Autenticacao](/docs/api-reference/auth)
+
+---
+
+## Pedidos
+
+| Recurso | Endpoint | Descricao |
+|---|---|---|
+| **Criar pedido** | `POST /orders` | Checkout (requer auth) |
+| **Pagar** | `POST /orders/{id}/pay` | Iniciar pagamento MercadoPago |
+| **Dev pay** | `POST /orders/{id}/dev-pay` | Simular pagamento (dev only) |
+| **Consultar** | `GET /orders/{id}` | Detalhe do pedido |
+| **Meus pedidos** | `GET /orders/me` | Listar pedidos do usuario |
+| **Seller items** | `GET /orders/seller/items` | Itens do seller |
+| **Fulfillment** | `PATCH /orders/items/{id}/fulfillment` | Atualizar status (admin) |
+
+Detalhes completos: [Pedidos](/docs/api-reference/orders)
+
+---
+
+## Padrao de URLs
+
+:::info Convencao
+- **Criacao/Listagem:** aninhado sob o recurso pai -- `POST /products/types/{id}/assets`
+- **CRUD individual:** flat com ID -- `PATCH /products/assets/{id}`
+- **Seller:** prefixo `/me` -- `GET /seller-products/me`
+- **Admin:** prefixo `/admin` -- `GET /products/templates/admin/all`
+:::
+
+## Autenticacao
+
+Todas as requests autenticadas usam:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+Tokens obtidos via `POST /auth/login` ou `POST /auth/signup`.

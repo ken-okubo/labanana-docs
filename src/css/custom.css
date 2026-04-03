@@ -1,0 +1,194 @@
+/**
+ * Labanana Docs — Custom Theme
+ * Clean, editorial documentation style.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --ifm-color-primary: #10b981;
+  --ifm-color-primary-dark: #0ea472;
+  --ifm-color-primary-darker: #0d9b6c;
+  --ifm-color-primary-darkest: #0b8059;
+  --ifm-color-primary-light: #2ec491;
+  --ifm-color-primary-lighter: #36c896;
+  --ifm-color-primary-lightest: #56d3a8;
+
+  --ifm-code-font-size: 95%;
+  --ifm-font-family-base: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --ifm-heading-font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  --docusaurus-highlighted-code-line-bg: rgba(16, 185, 129, 0.1);
+
+  --ifm-navbar-height: 64px;
+  --ifm-footer-padding-vertical: 2rem;
+  --ifm-heading-font-weight: 700;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #10b981;
+  --ifm-color-primary-dark: #0ea472;
+  --ifm-color-primary-darker: #0d9b6c;
+  --ifm-color-primary-darkest: #0b8059;
+  --ifm-color-primary-light: #2ec491;
+  --ifm-color-primary-lighter: #36c896;
+  --ifm-color-primary-lightest: #56d3a8;
+
+  --ifm-background-color: #0d1117;
+  --ifm-background-surface-color: #161b22;
+  --ifm-navbar-background-color: #0d1117;
+  --ifm-footer-background-color: #0d1117;
+
+  --docusaurus-highlighted-code-line-bg: rgba(16, 185, 129, 0.15);
+}
+
+/* Navbar */
+.navbar {
+  box-shadow: none;
+  border-bottom: 1px solid var(--ifm-toc-border-color);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme='dark'] .navbar {
+  background-color: rgba(13, 17, 23, 0.85);
+}
+
+.navbar__title {
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+}
+
+/* Sidebar — clean hierarchy */
+.theme-doc-sidebar-container {
+  border-right: 1px solid var(--ifm-toc-border-color);
+}
+
+.menu__link {
+  font-size: 0.875rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.menu__link--active:not(.menu__link--sublist) {
+  font-weight: 600;
+}
+
+/* Sidebar category labels — bolder */
+.menu__list-item-collapsible > .menu__link {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.menu__list-item-collapsible > .menu__link:hover {
+  color: var(--ifm-color-primary);
+}
+
+/* Nested sidebar items */
+.menu__list .menu__list {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--ifm-color-emphasis-200);
+  margin-left: 0.75rem;
+}
+
+/* Admonitions */
+.admonition {
+  border-radius: 8px;
+  border-left-width: 4px;
+}
+
+/* Code blocks */
+.prism-code {
+  border-radius: 8px;
+}
+
+code {
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+/* Tables */
+table {
+  display: table;
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+table th {
+  background-color: var(--ifm-background-surface-color);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+table td {
+  vertical-align: top;
+}
+
+/* Details/summary */
+details {
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+details summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Mermaid diagrams */
+.docusaurus-mermaid-container {
+  margin: 1.5rem 0;
+}
+
+/* Headings */
+h1 {
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  letter-spacing: -0.01em;
+  margin-top: 2.5rem;
+}
+
+h2::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: var(--ifm-toc-border-color);
+  margin-bottom: 2rem;
+}
+
+.markdown > h2:first-child::before,
+h1 + h2::before {
+  display: none;
+}
+
+/* Responsive tables */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* TOC refinement */
+.table-of-contents__link {
+  font-size: 0.8rem;
+}
+
+.table-of-contents__link--active {
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+}

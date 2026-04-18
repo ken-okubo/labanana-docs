@@ -47,9 +47,27 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Guia do Seller',
       collapsed: false,
-      link: {type: 'generated-index', title: 'Guia do Seller', description: 'Upload de arte, criacao de produto, renders e publicacao.'},
+      link: {type: 'generated-index', title: 'Guia do Seller', description: 'Onboarding, upload de arte, criacao de produto, renders, dashboard e payouts.'},
       items: [
+        'flows/seller-onboarding',
         'flows/seller-product',
+        'flows/seller-dashboard',
+      ],
+    },
+
+    {
+      type: 'html',
+      value: '<hr style="margin: 0.75rem 0;" />',
+    },
+
+    {
+      type: 'category',
+      label: 'Integracoes',
+      collapsed: false,
+      link: {type: 'generated-index', title: 'Integracoes', description: 'Gateways externos: pagamento (Asaas) e frete (Melhor Envio).'},
+      items: [
+        'integrations/payments-asaas',
+        'integrations/shipping-melhor-envio',
       ],
     },
 
@@ -66,6 +84,12 @@ const sidebars: SidebarsConfig = {
         'api-reference/endpoints',
         'api-reference/auth',
         'api-reference/orders',
+        'api-reference/social',
+        'api-reference/discovery',
+        'api-reference/catalog-consolidated',
+        'api-reference/product-gallery',
+        'api-reference/admin-users',
+        'api-reference/power-tools',
       ],
     },
 
@@ -73,11 +97,13 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Frontend',
       collapsed: true,
-      link: {type: 'generated-index', title: 'Frontend', description: 'Logica de renderizacao, galeria e types.'},
+      link: {type: 'generated-index', title: 'Frontend', description: 'Logica de renderizacao, galeria, checkout e tracking.'},
       items: [
         'frontend/public-page',
         'frontend/gallery',
         'frontend/types',
+        'frontend/checkout-flow',
+        'frontend/status-and-tracking',
       ],
     },
 
@@ -88,6 +114,17 @@ const sidebars: SidebarsConfig = {
       items: [
         'business-logic/overview',
         'business-logic/deactivation-impact',
+      ],
+    },
+
+    {
+      type: 'category',
+      label: 'Desenvolvimento',
+      collapsed: true,
+      link: {type: 'generated-index', title: 'Desenvolvimento', description: 'Setup local, testes end-to-end, scripts e cron.'},
+      items: [
+        'development/local-testing-tunnel',
+        'development/scripts-and-cron',
       ],
     },
 

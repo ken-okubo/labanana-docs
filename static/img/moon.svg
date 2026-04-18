@@ -1,0 +1,60 @@
+<svg width="82" height="82" viewBox="6 5 82 82" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#moon_shadow)">
+<circle cx="45" cy="45" r="35" fill="url(#moon_outer)"/>
+<circle cx="45" cy="45" r="29" fill="url(#moon_inner)"/>
+<mask id="moon_mask" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="10" y="10" width="70" height="70">
+<circle cx="45" cy="45" r="35" fill="url(#moon_mask_grad)"/>
+</mask>
+<g mask="url(#moon_mask)">
+<circle cx="65" cy="59" r="15" fill="url(#moon_crater1)"/>
+<circle cx="37" cy="75" r="9" fill="url(#moon_crater2)"/>
+<circle cx="48" cy="41" r="2" fill="url(#moon_crater3)"/>
+<circle cx="37" cy="52" r="4" fill="url(#moon_crater4)"/>
+<circle cx="16.5" cy="50.5" r="5.5" fill="url(#moon_crater5)"/>
+</g>
+</g>
+<defs>
+<filter id="moon_shadow" x="6" y="5" width="82" height="82" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="2" dy="1"/>
+<feGaussianBlur stdDeviation="3"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+</filter>
+<linearGradient id="moon_outer" x1="45" y1="10" x2="45" y2="80" gradientUnits="userSpaceOnUse">
+<stop stop-color="#D6E9FF"/>
+<stop offset="1" stop-color="#CDE4FF"/>
+</linearGradient>
+<linearGradient id="moon_inner" x1="45" y1="16" x2="45" y2="74" gradientUnits="userSpaceOnUse">
+<stop stop-color="#CEE5FF"/>
+<stop offset="0.9999" stop-color="#EDF6FF"/>
+<stop offset="1" stop-color="#F1F9FF"/>
+</linearGradient>
+<linearGradient id="moon_mask_grad" x1="45" y1="10" x2="45" y2="80" gradientUnits="userSpaceOnUse">
+<stop stop-color="#DDEDFF"/>
+<stop offset="1" stop-color="#3483F9"/>
+</linearGradient>
+<linearGradient id="moon_crater1" x1="65" y1="44" x2="65" y2="74" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C8D7FF"/>
+<stop offset="1" stop-color="#DCF0FF" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="moon_crater2" x1="37" y1="66" x2="37" y2="84" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C8D7FF"/>
+<stop offset="1" stop-color="#DCF0FF" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="moon_crater3" x1="48" y1="39" x2="48" y2="43" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C8D7FF"/>
+<stop offset="1" stop-color="#DCF0FF" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="moon_crater4" x1="37" y1="48" x2="37" y2="56" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C8D7FF"/>
+<stop offset="1" stop-color="#DCF0FF" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="moon_crater5" x1="16.5" y1="45" x2="16.5" y2="56" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C8D7FF"/>
+<stop offset="1" stop-color="#DCF0FF" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>

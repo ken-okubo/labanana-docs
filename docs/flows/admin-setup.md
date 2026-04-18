@@ -37,9 +37,13 @@ POST /products/types
   "name": "Caneca Cerâmica",
   "description": "Caneca de cerâmica personalizada",
   "platformFeePercent": 15,
-  "artistRoyaltyPercent": 20
+  "artistRoyaltyPercent": 30
 }
 ```
+
+:::info Percentuais configuráveis por ProductType
+`platformFeePercent` e `artistRoyaltyPercent` são **definidos por ProductType** — cada produto pode ter estratégia comercial diferente. Valores típicos hoje: `15` / `30`. Ver [Modelo de Preços](/docs/concepts/pricing).
+:::
 
 **Validações do slug:**
 - Apenas letras minúsculas, números e hífens (`^[a-z0-9-]+$`)
@@ -56,7 +60,7 @@ POST /products/types
   "name": "Caneca Cerâmica",
   "description": "Caneca de cerâmica personalizada",
   "platformFeePercent": 15,
-  "artistRoyaltyPercent": 20,
+  "artistRoyaltyPercent": 30,
   "isActive": true,
   "createdAt": "2026-03-12T00:00:00Z"
 }
@@ -84,6 +88,23 @@ Envie apenas os campos que deseja alterar.
 ## Passo 2: Criar Assets
 
 Assets são as características estruturais. Cada par key/value é um registro separado.
+
+### Unitário
+
+```http
+POST /products/types/{product_type_id}/assets
+```
+
+```json
+{
+  "key": "size",
+  "keyLabelPt": "Tamanho",
+  "value": "350ml",
+  "labelPt": "350ml"
+}
+```
+
+### Em lote (recomendado)
 
 ```http
 POST /products/types/{product_type_id}/assets/bulk
@@ -223,7 +244,7 @@ PATCH /products/types/{product_type_id}/variants/bulk
 }
 ```
 
-### Criação manual (quando necessário)
+### Criação manual (unitária)
 
 ```http
 POST /products/types/{product_type_id}/variants
@@ -239,13 +260,33 @@ POST /products/types/{product_type_id}/variants
 }
 ```
 
-:::warning Validações automáticas
+### Criação bulk (combinações específicas)
+
+Diferente do `generate-variants` (cartesiano completo), o bulk manual permite criar **subconjuntos** de combinações com custos diferentes:
+
+```http
+POST /products/types/{product_type_id}/variants/bulk
+```
+
+```json
+{
+  "variants": [
+    { "assetIds": ["uuid-size-350ml", "uuid-finish-glossy"], "baseCostCents": 1500, "sku": "CANECA-350-GLOSSY" },
+    { "assetIds": ["uuid-size-700ml", "uuid-finish-glossy"], "baseCostCents": 2200, "sku": "CANECA-700-GLOSSY" }
+  ]
+}
+```
+
+Response: `{ created, skipped, errors }` — cada item é validado independentemente.
+
+:::warning Validações automáticas (criação unitária e bulk)
 | Erro | HTTP |
 | --- | --- |
 | Asset ID não existe | 400 |
 | Asset de outro product type | 400 |
 | Asset inativo | 400 |
 | Dois assets com mesma key | 400 |
+| ID duplicado na lista | 400 |
 | Combinação já existe | 409 |
 :::
 
@@ -309,7 +350,7 @@ POST   /products/templates/{templateId}/test-render           — render de test
 
 ```
 1. POST /products/types
-   → "Caneca Cerâmica" (fee: 15%, royalty: 20%)
+   → "Caneca Cerâmica" (fee: 15%, royalty: 30%)
 
 2. POST /products/types/{id}/assets/bulk
    → size: 350ml, 700ml | finish: glossy, matte

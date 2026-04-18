@@ -18,7 +18,8 @@ graph LR
         PT[ProductType] --> Assets
         PT --> Options
         Assets --> Variants
-        PT --> Templates
+        Assets --> Templates
+        Options --> Templates
     end
 
     subgraph Seller
@@ -35,6 +36,14 @@ graph LR
     Variants --> SP
     Renders --> Loja
 ```
+
+:::info Como Assets e Options conectam com Templates
+**Assets** do template são o "match por subset" — ex: `assets: {size: "350ml"}` casa com qualquer variant que contenha `size=350ml`.
+
+**Options** do template são opcionais — se `null`, o mockup serve para qualquer cor/lado. Se `{color: "black"}`, só aparece quando o cliente seleciona preto.
+
+Ver [Templates e Renders](/docs/concepts/templates) para detalhes.
+:::
 
 | Perfil | O que faz | Guia |
 |--------|-----------|------|

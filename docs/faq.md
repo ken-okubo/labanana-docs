@@ -67,3 +67,15 @@ O SKU é **por ProductType**. Ao desativar uma variant, o SKU é liberado para r
 ### Como o frontend sabe qual preço mostrar?
 
 O preço é fixo por SKU (`priceCents`). Trocar assets → troca de SKU → muda o preço. Trocar options → **nunca** muda o preço. O frontend exibe `minPriceCents` como "A partir de R$ X".
+
+---
+
+### Quando `template.options` é `null`?
+
+Significa que o template serve para **qualquer combinação de options**. Útil quando a option não afeta o mockup (ex: caneca genérica sem cor específica). Renders de templates genéricos **sempre** aparecem na galeria, independente da option selecionada.
+
+---
+
+### Por que cada SKU retorna uma lista `renders[]` em vez de um único `renderUrl`?
+
+Porque a mesma variant pode ter **múltiplos mockups**: frente e costas, múltiplos ângulos, ou um render por cor. O frontend filtra `renders[]` pelas options selecionadas pelo cliente para montar o carousel da galeria. Ver [Galeria e Filtragem](/docs/frontend/gallery).

@@ -1,0 +1,495 @@
+---
+sidebar_position: 2
+title: Dashboard do Seller
+---
+
+import PayoutBreakdown from '@site/src/components/PayoutBreakdown';
+import StatusFlowDiagram from '@site/src/components/StatusFlowDiagram';
+
+# Dashboard do Seller
+
+Endpoints que alimentam o "Studio" do artista: **storeStatus** (publicar/despublicar loja), **stats** (métricas), **wallet** (saldo) e **payouts** (saques via PIX).
+
+## Conceito em 30 segundos
+
+- No momento em que o pedido é **criado**, a plataforma congela no `OrderItem` o `platformFeePercent`, `artistCommissionPercent` e o `artistEarningsCents` (valor absoluto já calculado). Mudar o `ProductType` depois **não** afeta pedidos antigos.
+- Quando o pedido é **pago** (`paymentStatus=approved`), o backend cria 1 `SellerPayoutItem` por `OrderItem` com `status=held`.
+- Quando o item é **entregue** (`fulfillmentStatus=delivered`), o `SellerPayoutItem` vira `releasable` (sacável).
+- O **admin** agrupa vários `SellerPayoutItem` `releasable` em um `SellerPayout` (batch), executa o PIX **fora do sistema**, e marca o batch como `paid` com o `transactionId`.
+- Se o item é **devolvido** antes de ser pago: `SellerPayoutItem` vira `reversed`. Se já foi pago, admin trata manualmente.
+
+---
+
+## 1. Store Status (toggle de visibilidade)
+
+O `SellerProfile` tem um campo `storeStatus` que controla se a loja é visível publicamente.
+
+| Valor | Descrição |
+|---|---|
+| `unpublished` | Loja **não** visível (padrão ao criar) |
+| `published` | Loja visível publicamente |
+
+**Leitura:** retornado em `GET /profiles/seller/me` como `storeStatus`.
+
+**Atualização:**
+
+```http
+PATCH /profiles/seller/me
+```
+
+```json
+{ "storeStatus": "published" }
+```
+
+:::tip Use como toggle principal
+Botão "Publicar loja" / "Despublicar loja" no dashboard deve mudar apenas este campo. O seller pode voltar a `unpublished` a qualquer momento — é reversível.
+:::
+
+---
+
+## 2. Stats (métricas agregadas)
+
+```http
+GET /sellers/me/stats?from=2026-01-01&to=2026-03-31
+```
+
+Filtra por `paid_at` — só conta pedidos com `paymentStatus=approved`.
+
+| Param | Obrigatório | Descrição |
+|---|:---:|---|
+| `from` | Não | Data início ISO 8601 |
+| `to` | Não | Data fim ISO 8601 |
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "totalEarningsCents": 125000,
+  "orderCount": 15,
+  "itemsSold": 42
+}
+```
+
+</details>
+
+**Admin espelhado:** `GET /sellers/{sellerProfileId}/stats?from=&to=`.
+
+---
+
+## 3. Wallet (saldo)
+
+```http
+GET /sellers/me/wallet
+```
+
+Derivado das linhas `SellerPayoutItem` — uma por `OrderItem`.
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "totalEarnedCents": 250000,
+  "heldCents": 40000,
+  "releasableCents": 50000,
+  "pendingPayoutCents": 10000,
+  "paidCents": 150000,
+  "failedCents": 0,
+  "availableCents": 50000
+}
+```
+
+</details>
+
+### Pipeline de dinheiro
+
+<PayoutBreakdown
+  title="Wallet breakdown — exemplo"
+  total={250000}
+  stages={[
+    {
+      id: 'held',
+      label: 'Held',
+      amountCents: 40000,
+      tone: 'hold',
+      description: 'Pedido approved mas item ainda não delivered. Retido até confirmação da entrega.',
+      trigger: 'Criado quando paymentStatus vira approved',
+    },
+    {
+      id: 'releasable',
+      label: 'Releasable · available',
+      amountCents: 50000,
+      tone: 'ready',
+      description: 'Item delivered e ainda não foi incluído em um batch de payout. Pronto para saque.',
+      trigger: 'Sync quando shipment.status=delivered ou item vira delivered',
+    },
+    {
+      id: 'pending',
+      label: 'Pending payout',
+      amountCents: 10000,
+      tone: 'pending',
+      description: 'Já incluído em um SellerPayout com status pending ou scheduled. Admin ainda não marcou como pago.',
+      trigger: 'Admin: POST /payouts cria o batch',
+    },
+    {
+      id: 'paid',
+      label: 'Paid',
+      amountCents: 150000,
+      tone: 'paid',
+      description: 'Batch marcado como pago via PIX. Terminal.',
+      trigger: 'Admin: PATCH /payouts/{id}/mark-paid',
+      terminal: true,
+    },
+  ]}
+/>
+
+:::info `failedCents` é sempre `0`
+Quando um batch é marcado como `failed`, **os items voltam imediatamente para `releasable`** (com `payoutId = null`) — eles não entram em um status `failed`. O campo `failedCents` existe por compatibilidade, mas você pode ignorar no frontend.
+:::
+
+| Campo | Descrição |
+|---|---|
+| `totalEarnedCents` | Soma histórica de tudo que **não** foi `reversed` |
+| `heldCents` | Pedido `approved` mas item ainda não `delivered` |
+| `releasableCents` | Item `delivered`, ainda **não** incluído em um batch |
+| `pendingPayoutCents` | Item já incluído em `SellerPayout` com status `pending`/`scheduled` |
+| `paidCents` | Item em batch marcado como `paid` |
+| `failedCents` | Sempre `0` — reservado. Item de batch `failed` volta direto para `releasable` |
+| `availableCents` | Alias de `releasableCents` — valor que pode entrar em novo batch |
+
+**Admin espelhado:** `GET /sellers/{sellerProfileId}/wallet`.
+
+---
+
+## 4. Configuração de Payout (PIX)
+
+O seller precisa configurar sua chave PIX para que o admin consiga gerar batches em seu nome.
+
+### Campos no SellerProfile
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `pixKey` | string (nullable) | Chave PIX |
+| `pixKeyType` | string (nullable) | `cpf`, `cnpj`, `email`, `phone`, `random` |
+
+### Atualizar
+
+```http
+PATCH /profiles/seller/me
+```
+
+```json
+{
+  "pixKey": "123.456.789-00",
+  "pixKeyType": "cpf"
+}
+```
+
+**Validações:**
+- `pixKey` e `pixKeyType` devem ser enviados **juntos** (erro se enviar um sem o outro)
+- `pixKeyType` deve ser um dos 5 valores aceitos
+
+### `payoutComplete` no perfil
+
+O `GET /profiles/seller/me` retorna `payoutComplete: true/false`. É `true` quando **todos** os critérios são atendidos:
+
+- `pixKey` preenchido
+- `pixKeyType` preenchido
+- `email` do usuário preenchido
+- `whatsapp` do usuário preenchido
+
+```json
+{
+  "pixKey": "123.456.789-00",
+  "pixKeyType": "cpf",
+  "email": "seller@email.com",
+  "whatsapp": "+5511999999999",
+  "payoutComplete": true
+}
+```
+
+:::tip Use como checklist no frontend
+Mostre `payoutComplete` como um indicador visual ("Pronto para receber" / "Complete seu cadastro") e liste os campos faltantes. Ajuda o seller a saber o que falta antes do primeiro saque.
+:::
+
+### Snapshot no batch
+
+Quando o admin cria um batch (`POST /payouts`), os campos `pixKey` e `pixKeyType` são gravados como snapshot no `SellerPayout`. **Mudanças posteriores no `SellerProfile` não afetam batches já criados.**
+
+---
+
+## 5. Ciclo de vida do Payout Item
+
+A plataforma rastreia o que é devido ao seller através de `SellerPayoutItem` (uma linha por `OrderItem`). O valor é copiado de `OrderItem.artistEarningsCents` — já snapshotado no momento da criação do pedido, com os percentuais do ProductType daquele momento.
+
+:::info Snapshot é imutável
+`SellerPayoutItem.amountCents` é copiado de `artistEarningsCents` e **permanece imutável** mesmo que os percentuais do ProductType mudem depois.
+:::
+
+<StatusFlowDiagram
+  title="SellerPayoutItem — transições"
+  states={[
+    {id: 'held',       label: 'held',       description: 'Pedido approved, item não delivered', tone: 'warning'},
+    {id: 'releasable', label: 'releasable', description: 'Item delivered, pronto para batch',   tone: 'neutral'},
+    {id: 'paid',       label: 'paid',       description: 'Batch marcado como pago',              tone: 'success', terminal: true},
+    {id: 'reversed',   label: 'reversed',   description: 'Item devolvido/cancelado antes do pagamento', tone: 'danger', terminal: true},
+  ]}
+  transitions={[
+    {from: 'held',       to: 'releasable', label: 'item delivered',               trigger: 'auto'},
+    {from: 'held',       to: 'reversed',   label: 'fulfillment=returned ou order refunded/cancelled', trigger: 'auto'},
+    {from: 'releasable', to: 'paid',       label: 'PATCH /payouts/{id}/mark-paid (batch marcado como pago)', trigger: 'admin'},
+    {from: 'releasable', to: 'reversed',   label: 'order reversed antes do batch', trigger: 'auto'},
+    {from: 'paid',       to: 'releasable', label: 'batch mark-failed → item volta disponível', trigger: 'admin'},
+  ]}
+/>
+
+:::danger Status possíveis do `SellerPayoutItem`: `held` · `releasable` · `paid` · `reversed`
+**Não existe status `failed` no item.** Quando o admin marca um batch como `failed`, os items do batch voltam para `releasable` com `payoutId = null` — prontos para entrar em um novo batch.
+:::
+
+:::warning Reversão após `paid` não é automática
+Se a order for devolvida **depois** do item ter sido pago, o admin resolve manualmente (log é gerado). O sistema não reverte pagamentos já liquidados por PIX.
+:::
+
+### Listar payout items do seller
+
+```http
+GET /sellers/me/payout-items?status=releasable&skip=0&limit=100
+```
+
+Query opcional `status`: `held`, `releasable`, `paid`, `reversed`.
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "sellerProfileId": "uuid",
+      "orderId": "uuid",
+      "orderItemId": "uuid",
+      "payoutId": null,
+      "amountCents": 2500,
+      "status": "releasable",
+      "heldAt": "2026-04-10T10:00:00Z",
+      "releasedAt": "2026-04-15T18:00:00Z",
+      "paidAt": null,
+      "reversedAt": null,
+      "reason": null,
+      "createdAt": "2026-04-10T10:00:00Z"
+    }
+  ],
+  "total": 1,
+  "skip": 0,
+  "limit": 100
+}
+```
+
+</details>
+
+**Admin espelhado:** `GET /sellers/{sellerProfileId}/payout-items?status=releasable`.
+
+---
+
+## 6. Payouts (batches)
+
+Batch = `SellerPayout`, um registro agregando N `SellerPayoutItem`s pagos juntos via PIX. **Apenas admin cria batches.**
+
+### Listar batches
+
+```http
+GET /sellers/me/payouts?skip=0&limit=100
+```
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "payouts": [
+    {
+      "id": "uuid",
+      "sellerProfileId": "uuid",
+      "amountCents": 50000,
+      "status": "pending",
+      "periodStart": "2026-04-01",
+      "periodEnd": "2026-04-08",
+      "scheduledFor": null,
+      "pixKey": "seller@email.com",
+      "pixKeyType": "email",
+      "transactionId": null,
+      "failureReason": null,
+      "paidAt": null,
+      "createdAt": "2026-04-08T12:00:00Z"
+    }
+  ],
+  "total": 1,
+  "skip": 0,
+  "limit": 100
+}
+```
+
+</details>
+
+**Status do batch:** `pending` → `paid` | `failed`. (`scheduled` é reservado para uso futuro com cron.)
+
+**Admin espelhado:** `GET /sellers/{sellerProfileId}/payouts`.
+
+### Admin — criar batch
+
+```http
+POST /payouts
+```
+
+```json
+{
+  "sellerProfileId": "uuid",
+  "payoutItemIds": ["uuid", "uuid"],
+  "pixKey": "seller@email.com",
+  "pixKeyType": "email",
+  "scheduledFor": "2026-04-20"
+}
+```
+
+**Validações:**
+- Todos `payoutItemIds` devem existir, pertencer ao `sellerProfileId`, estar em `releasable` e **não** já vinculados a outro batch
+- `pixKey`/`pixKeyType` normalmente vêm do `SellerProfile` atual (snapshot no batch)
+- **Batch só pode conter items de um único seller** — `POST /payouts` valida que todos os items pertencem ao `sellerProfileId` informado
+- **Não existe endpoint cross-seller** (tipo `GET /payouts` listando batches de todos os sellers). A UI admin deve partir da lista de sellers → entrar no seller → listar payouts daquele seller (`GET /sellers/{id}/payouts`)
+
+**Response:** `SellerPayoutDetailResponse` (batch + items).
+
+### Admin — detalhe do batch
+
+```http
+GET /payouts/{payoutId}
+```
+
+Retorna batch + items incluídos.
+
+### Admin — marcar batch como pago
+
+```http
+PATCH /payouts/{payoutId}/mark-paid
+```
+
+```json
+{ "transactionId": "E123456789-pix-id" }
+```
+
+Cascata: todos os items do batch → `paid`, `paidAt = now`. Batch → `paid`.
+
+### Admin — marcar batch como falho
+
+```http
+PATCH /payouts/{payoutId}/mark-failed
+```
+
+```json
+{ "failureReason": "Pix recusado pelo banco" }
+```
+
+Cascata: items voltam para `releasable` (`payoutId=null`) e podem ser re-batchados. Batch → `failed` com `failureReason` gravado.
+
+:::danger Batch `paid` não pode ser marcado como `failed`
+Se o batch já está em `paid`, o `mark-failed` retorna **400** (`ValueError`). Use `mark-failed` apenas em batches `pending`.
+:::
+
+---
+
+## 7. Endpoints admin (espelhados)
+
+| Endpoint | Descrição |
+|---|---|
+| `GET /sellers/{id}/stats?from=&to=` | Stats de qualquer seller |
+| `GET /sellers/{id}/wallet` | Wallet de qualquer seller |
+| `GET /sellers/{id}/payouts` | Batches de qualquer seller |
+| `GET /sellers/{id}/payout-items?status=...` | Payout items de qualquer seller |
+| `POST /payouts` | Criar batch |
+| `GET /payouts/{id}` | Detalhe do batch com items |
+| `PATCH /payouts/{id}/mark-paid` | Marcar como pago |
+| `PATCH /payouts/{id}/mark-failed` | Marcar como falho |
+
+O `{id}` é o `sellerProfileId` (UUID). Todos exigem role `admin`.
+
+---
+
+## Snapshot de % na criação do pedido
+
+O `OrderItem` snapshota no momento do pedido:
+
+| Campo snapshot | Fonte |
+|---|---|
+| `platformFeePercent` | `ProductType.platform_fee_percent` |
+| `artistCommissionPercent` | `ProductType.artist_royalty_percent` |
+| `artistEarningsCents` | Calculado (ver fórmula abaixo) |
+| `unitPriceCents` / `baseCostCents` | `SellerProductVariant.price_cents` / `ProductVariant.base_cost_cents` |
+
+**Fórmula exata** (tudo em centavos, aritmética inteira com **floor division**):
+
+```
+platform_fee_cents = price_cents * platform_fee_percent // 100
+profit_cents       = price_cents - base_cost_cents - platform_fee_cents
+artist_earnings    = profit_cents * artist_commission_percent // 100   (0 se profit <= 0)
+```
+
+:::warning Item com `artistEarningsCents ≤ 0` não gera `SellerPayoutItem`
+Se o preço é muito baixo (ex: custo + taxa ≥ preço), o ganho do artista é 0 ou negativo. Nesses casos o backend **não cria** linha de payout — você **não vai ver** esse `OrderItem` no extrato. Útil debugar quando item aparece no pedido mas não no wallet.
+:::
+
+:::tip Por que o snapshot importa
+Mudar os percentuais do `ProductType` depois **não** afeta pedidos antigos nem payouts. Isso protege o seller de ter os ganhos recalculados retroativamente, e mantém o histórico auditável. O `SellerPayoutItem.amountCents` copia o `artistEarningsCents` e também permanece imutável.
+:::
+
+---
+
+## Payout Hooks (para quem trabalha no backend)
+
+As transições de `SellerPayoutItem` são disparadas automaticamente por hooks vinculados a mutações de order/shipment. Conhecer a tabela ajuda a entender **quem cria/muda** cada item e como **não duplicar** a lógica ao adicionar novos caminhos de mutação.
+
+| Gatilho | Hook | O que faz |
+|---|---|---|
+| `update_payment_status(approved)` | `create_payout_items_for_approved_order` | Cria items `held` para cada `OrderItem` com `artistEarningsCents > 0` |
+| `update_payment_status(refunded / cancelled)` | `reverse_payout_items_for_order` | Marca items como `reversed` |
+| `_sync_fulfillment_from_shipment → delivered` | `release_payout_items_for_order` | Move items de `held → releasable` |
+| `update_item_fulfillment(delivered)` | `release_payout_items_for_order` | Idem (caso fulfillment manual por item) |
+| `update_item_fulfillment(returned)` | `reverse_payout_item` | Marca **o item específico** como `reversed` |
+| `cancel_order_with_refund` | via `update_payment_status` | Reversão em cascata |
+
+:::info Idempotência
+`create_payout_items_for_approved_order` verifica via constraint `UNIQUE(orderItemId)` se já existe payout item — protege contra webhook Asaas duplicado. Seguro para retry.
+:::
+
+---
+
+## Regras de negócio
+
+- Item com `artistEarningsCents <= 0` **não gera** `SellerPayoutItem` (nada a pagar — útil debugar quando item aparece no pedido mas não no wallet)
+- Item já `paid` que depois vira `returned` **não** é revertido automaticamente — apenas log de warning; admin resolve manual (ajuste negativo ou recuperação do valor com o seller)
+- Batch com status `paid` **não pode** ser marcado como `failed` (backend retorna `400` com `ValueError`)
+- Batch com items de **sellers diferentes**: proibido — `POST /payouts` valida que todos os items pertencem ao `sellerProfileId` informado
+- `pixKey` no batch **pode ser nula** — admin preenche se o seller ainda não configurou, mas só deve marcar como `paid` após efetuar o PIX
+
+## Limitações conhecidas (MVP)
+
+- **Não há Pix-out automático via Asaas** — admin executa o PIX manualmente e marca o batch como `paid`. Roadmap: função `execute_payout(payout)` chamando `asaas.create_transfer(...)` com callback
+- `SellerPayout.status=scheduled` está **reservado mas não usado** pelo código — útil para cron de agendamento futuro
+- Devolução de item já pago exige **intervenção manual** — no futuro pode-se gerar `SellerPayoutItem` com `amountCents` **negativo** compensando o saldo
+- `OrderShipment` é **1:1 com `Order`**. Se uma ordem tem items de múltiplos sellers e o shipment vira `delivered`, todos os items viram `releasable` simultaneamente — correto, mas pressupõe que a entrega foi efetiva para todos
+- **Não existe endpoint cross-seller** de batches (tipo `GET /payouts` listando todos). Admin navega de seller → payouts
+- **Frontend não pode disparar `execute_payout`** — só admin, via painel interno, após efetuar o PIX manualmente
+
+## Arquivos principais
+
+| Arquivo | Conteúdo |
+|---|---|
+| `app/models/seller_payout.py` | `SellerPayout`, `SellerPayoutItem`, enums |
+| `app/crud/payout.py` | Lifecycle + wallet + admin batch ops |
+| `app/crud/order.py` | Hooks que chamam `crud/payout` |
+| `app/routers/sellers.py` | Wallet, list payouts/items (read-only) |
+| `app/routers/payouts.py` | Admin: create / mark-paid / mark-failed |
+| `app/schemas/payout.py` | Schemas Pydantic |
+| `alembic/versions/x5y6z7a8b9c0_add_seller_payout_items.py` | Migration (cria tabela + reset de dados) |

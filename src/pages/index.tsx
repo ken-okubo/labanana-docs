@@ -12,6 +12,10 @@ import {
   IconScale,
   IconHelp,
   IconArrowRight,
+  IconCreditCard,
+  IconTruckDelivery,
+  IconWallet,
+  IconTerminal2,
 } from '@tabler/icons-react';
 
 import styles from './index.module.css';
@@ -95,37 +99,71 @@ export default function Home(): ReactNode {
             cta="Ver guias"
           />
           <Card
+            icon={<IconWallet size={ICON_SIZE} stroke={ICON_STROKE} />}
+            title="Seller Dashboard"
+            subtitle="Stats, Wallet e Payouts via PIX"
+            link="/docs/flows/seller-dashboard"
+            cta="Ver dashboard"
+          />
+        </div>
+
+        <div className={styles.sectionLabel}>Integrações</div>
+        <div className="row" style={{marginBottom: '2rem'}}>
+          <Card
+            icon={<IconCreditCard size={ICON_SIZE} stroke={ICON_STROKE} />}
+            title="Pagamentos (Asaas)"
+            subtitle="Pix, cartão, boleto, refund e cancel"
+            link="/docs/integrations/payments-asaas"
+            cta="Ver Asaas"
+          />
+          <Card
+            icon={<IconTruckDelivery size={ICON_SIZE} stroke={ICON_STROKE} />}
+            title="Frete (Melhor Envio)"
+            subtitle="Cálculo, etiqueta automática e polling"
+            link="/docs/integrations/shipping-melhor-envio"
+            cta="Ver envio"
+          />
+          <Card
             icon={<IconShieldLock size={ICON_SIZE} stroke={ICON_STROKE} />}
             title="Auth e Pedidos"
-            subtitle="JWT, checkout e fulfillment"
+            subtitle="JWT, CPF/CNPJ, checkout e fulfillment"
             link="/docs/api-reference/auth"
             cta="Ver endpoints"
           />
         </div>
 
         <div className={styles.sectionLabel}>Construa e integre</div>
-        <div className="row">
+        <div className="row" style={{marginBottom: '2rem'}}>
           <Card
             icon={<IconBrush size={ICON_SIZE} stroke={ICON_STROKE} />}
             title="Frontend"
-            subtitle="Galeria, filtros e TypeScript types"
+            subtitle="Galeria, checkout, tracking e types"
             link="/docs/frontend/public-page"
             cta="Integrar"
           />
           <Card
             icon={<IconScale size={ICON_SIZE} stroke={ICON_STROKE} />}
-            title="Regras de Negocio"
-            subtitle="Precos, validacoes e soft delete"
+            title="Regras de Negócio"
+            subtitle="Preços, validações e soft delete"
             link="/docs/business-logic/overview"
             cta="Consultar"
           />
           <Card
-            icon={<IconHelp size={ICON_SIZE} stroke={ICON_STROKE} />}
-            title="FAQ"
-            subtitle="Respostas rapidas"
-            link="/docs/faq"
-            cta="Ver FAQ"
+            icon={<IconTerminal2 size={ICON_SIZE} stroke={ICON_STROKE} />}
+            title="Desenvolvimento"
+            subtitle="Tunnel, testes E2E e troubleshooting"
+            link="/docs/development/local-testing-tunnel"
+            cta="Ver setup"
           />
+        </div>
+
+        <div className="row">
+          <div className="col col--12" style={{textAlign: 'center', paddingTop: '1rem'}}>
+            <Link to="/docs/faq" className={styles.faqInlineLink}>
+              <IconHelp size={18} stroke={1.8} style={{verticalAlign: 'middle', marginRight: '0.35rem'}} />
+              Dúvidas rápidas no FAQ
+            </Link>
+          </div>
         </div>
 
       </main>

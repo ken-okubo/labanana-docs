@@ -193,6 +193,11 @@ POST /products/templates/{templateId}/images/complete-batch
 
 O fluxo é similar, com uma diferença: **o registro no banco só é criado no complete**.
 
+:::info Diferença importante vs Template
+- **Template**: registro criado **antes** do upload (via `POST .../templates`)
+- **Artwork**: registro criado **no complete** (não existe no banco antes)
+:::
+
 ### Etapa 1: Presign
 
 ```http
@@ -218,15 +223,35 @@ POST /uploads/artworks/presign
 }
 ```
 
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "uploadUrl": "https://s3.amazonaws.com/...",
+  "key": "private/sellers/{sellerProfileId}/artworks/{artworkId}/original/v1.png",
+  "artworkId": "uuid-gerado-automaticamente",
+  "headers": { "Content-Type": "image/png" }
+}
+```
+
+</details>
+
+:::warning
+Guarde o `key` **e** o `artworkId` — você precisa dos dois na Etapa 3.
+:::
+
 ### Etapa 2: Upload direto no S3
 
-Mesmo fluxo — PUT na `uploadUrl` com Content-Type correto.
+Mesmo fluxo do template — PUT na `uploadUrl` com o mesmo `Content-Type` do presign.
 
 ### Etapa 3: Complete
 
 ```http
 POST /uploads/artworks/{artworkId}/complete
 ```
+
+**Como seller:**
 
 ```json
 {
@@ -235,11 +260,45 @@ POST /uploads/artworks/{artworkId}/complete
 }
 ```
 
+**Como admin** (deve repetir o mesmo `sellerProfileId` do presign):
+
+```json
+{
+  "key": "private/sellers/{sellerProfileId}/artworks/{artworkId}/original/v1.png",
+  "title": "Arte do Artista X",
+  "sellerProfileId": "uuid-do-seller"
+}
+```
+
 O servidor:
 1. Verifica se o arquivo existe no S3
 2. Extrai dimensões, formato e hash
-3. Cria o registro `Artwork` no banco
+3. Cria o registro `Artwork` no banco (vinculado ao seller)
 4. Gera preview WebP (max 1200px) no bucket público
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "artworkId": "uuid",
+  "artworkVersion": 1,
+  "widthPx": 3000,
+  "heightPx": 4000,
+  "sizeBytes": 2097152,
+  "mimeType": "image/png"
+}
+```
+
+</details>
+
+:::tip Transparência PNG
+O arquivo vai **direto para o S3** sem processamento. Se estiver aparecendo com fundo branco em algum visualizador, pode ser:
+- O **console do S3** não renderiza transparência (mostra branco)
+- O PNG original pode já ter sido salvo com fundo sólido (verifique no Figma/Photoshop — se o fundo xadrez aparece, há transparência)
+
+O preview WebP gerado mantém transparência.
+:::
 
 ### Estrutura no S3
 
@@ -262,3 +321,119 @@ public/sellers/{sellerProfileId}/artworks/{artworkId}/
 :::info Versionamento
 O `v1` no path é a versão da arte. Se o seller atualizar, a nova versão vai para `v2.png` e novos renders para `v2/`.
 :::
+
+---
+
+## Upload de Imagens de Perfil
+
+Avatar (seller + customer) e banner (só seller). Mesmo pattern presign → PUT S3 → complete. Bucket **público** com CDN — a URL retornada é permanente.
+
+### Limites
+
+| Campo | Valor |
+|---|---|
+| MIME | `image/png`, `image/jpeg`, `image/webp` |
+| Tamanho | **5 MB** |
+
+### Endpoints
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/profiles/seller/me/upload-url` | Presign seller (`imageType: "avatar"` ou `"banner"`) |
+| `POST` | `/profiles/seller/me/upload-complete` | Completa e atualiza `avatar_key` / `banner_key` |
+| `DELETE` | `/profiles/seller/me/image/{imageType}` | Remove do S3 e zera a key |
+| `POST` | `/profiles/customer/me/upload-url` | Presign customer (só `avatar`) |
+| `POST` | `/profiles/customer/me/upload-complete` | Completa |
+| `DELETE` | `/profiles/customer/me/image/avatar` | Remove avatar |
+
+### Fluxo
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant BE as Backend
+    participant S3
+
+    FE->>BE: 1. POST /profiles/seller/me/upload-url<br/>{ imageType, contentType, sizeBytes }
+    BE-->>FE: { uploadUrl, key, headers }
+
+    FE->>S3: 2. PUT uploadUrl (binary) com headers
+    S3-->>FE: 200 OK
+
+    FE->>BE: 3. POST /profiles/seller/me/upload-complete<br/>{ key, imageType }
+    BE->>S3: HEAD (valida existência)
+    S3-->>BE: 200
+    Note over BE: UPDATE seller_profile<br/>.avatar_key = key
+    BE-->>FE: { url (CDN permanente), key }
+```
+
+#### Etapa 1: Presign
+
+```http
+POST /profiles/seller/me/upload-url
+```
+
+```json
+{
+  "imageType": "avatar",
+  "contentType": "image/png",
+  "sizeBytes": 1048576
+}
+```
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "uploadUrl": "https://s3.amazonaws.com/...",
+  "key": "public/sellers/{sellerProfileId}/avatar/v1.png",
+  "headers": { "Content-Type": "image/png" }
+}
+```
+
+</details>
+
+#### Etapa 2: PUT no S3
+
+Mesmo padrão dos outros uploads — `PUT uploadUrl` com o arquivo binário e o `Content-Type` exatamente igual ao do presign.
+
+#### Etapa 3: Complete
+
+```http
+POST /profiles/seller/me/upload-complete
+```
+
+```json
+{
+  "key": "public/sellers/{sellerProfileId}/avatar/v1.png",
+  "imageType": "avatar"
+}
+```
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "url": "https://cdn.labanana.art/public/sellers/.../avatar/v1.png",
+  "key": "public/sellers/{sellerProfileId}/avatar/v1.png"
+}
+```
+
+</details>
+
+A `url` é **permanente** (CDN) — guarde e use diretamente. Não precisa refresh.
+
+:::warning Validações
+- A `key` no complete **deve ser igual** à retornada no presign — o backend valida que o prefix da key bate com o profile autenticado (não dá pra fazer upload "no lugar de outro")
+- Se você chamar complete antes do PUT S3 completar, o backend retorna `404` (o HEAD no S3 falha). Só chame complete depois do PUT retornar `200`
+:::
+
+### Remover imagem
+
+```http
+DELETE /profiles/seller/me/image/avatar
+```
+
+Deleta do S3 e zera `avatar_key` no perfil. O endpoint equivalente de customer só aceita `avatar`.

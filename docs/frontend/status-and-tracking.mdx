@@ -1,0 +1,159 @@
+---
+sidebar_position: 5
+title: Status e Tracking
+---
+
+import ViewRulesMatrix from '@site/src/components/ViewRulesMatrix';
+
+# Status e Tracking — regras por view
+
+Guia de como exibir status de pedido e tracking em cada view (Customer, Seller, Admin). Reflete as mudanças de sync automático introduzidas em **abril/2026**.
+
+## Mudanças de abril/2026
+
+1. **Sync automático de status** — quando o [polling do Melhor Envio](/docs/integrations/shipping-melhor-envio#4-tracking-polling-estratégia-principal) atualiza `shipment.status`, o backend **propaga automaticamente** para `fulfillmentStatus` de todos os items e da order. Admin **não precisa** mais marcar manualmente.
+2. **Auto-cancel de pedidos pendentes** — orders com `paymentStatus=pending` há mais de **24h** são canceladas automaticamente pelo cron. O payment no Asaas também é cancelado.
+3. **Tracking code syncado nos items** — `trackingCode` do `OrderShipment` é **copiado** para cada `OrderItem.trackingCode` quando o status avança.
+
+## Dados de shipping disponíveis
+
+Todos os endpoints que retornam `OrderResponse` incluem o bloco `shipment`:
+
+```json
+{
+  "shipment": {
+    "carrier": "correios",
+    "serviceCode": "SEDEX",
+    "priceCents": 1445,
+    "etaDays": 2,
+    "trackingCode": "PX12792017BR",
+    "labelUrl": "https://sandbox.melhorenvio.com.br/imprimir/xxx",
+    "status": "shipped",
+    "shippedAt": "2026-04-15T22:52:51Z",
+    "deliveredAt": null
+  }
+}
+```
+
+**Link de rastreio** — montar a partir do `trackingCode`:
+
+```
+https://www.melhorrastreio.com.br/rastreio/{trackingCode}
+```
+
+## Mapeamento de status para UI
+
+### `fulfillmentStatus` (primário)
+
+Use como **badge principal** em todas as views — já vem syncado com shipping.
+
+| Status | Label PT-BR | Cor sugerida | Ícone |
+|---|---|---|---|
+| `pending` | Pedido criado | cinza | relógio |
+| `in_production` | Em produção | azul | engrenagem |
+| `shipped` | Enviado | amarelo/laranja | caminhão |
+| `delivered` | Entregue | verde | check |
+| `returned` | Devolvido | vermelho | seta volta |
+
+### `shipment.status` (granularidade extra)
+
+Use quando quiser mostrar detalhe do transporte (customer e admin).
+
+| Status | Label PT-BR | Quando usar |
+|---|---|---|
+| `pending` | Aguardando envio | Etiqueta gerada mas não postado |
+| `shipped` | Postado | Pacote entregue na transportadora |
+| `in_transit` | Em trânsito | Pacote em movimento |
+| `delivered` | Entregue | Confirmado pela transportadora |
+| `returned` | Devolvido | Não entregue / devolvido |
+
+### `paymentStatus` (badges de listagem)
+
+| Status | Cor | Label |
+|---|---|---|
+| `pending` | amarelo | Aguardando pagamento |
+| `approved` | verde | Pago |
+| `rejected` | vermelho | Recusado |
+| `refunded` | cinza | Reembolsado |
+| `cancelled` | cinza | Cancelado |
+
+## Regras por view
+
+<ViewRulesMatrix
+  title="O que cada view vê e faz"
+  columns={[
+    {
+      title: 'Customer',
+      subtitle: '"Minha Conta"',
+      tone: 'blue',
+      icon: '👤',
+      rules: [
+        {label: 'Listagem', value: 'GET /orders/me com tabs: Todos · Em produção · Em trânsito · Entregues'},
+        {label: 'Cancelados', value: 'NÃO mostrar paymentStatus=cancelled na lista principal (ou aba separada)', emphasis: 'dont'},
+        {label: 'Pendentes', value: 'Mostrar aviso: "Finalize em até 24h ou o pedido será cancelado" + botão "Pagar agora" (usa initPoint)'},
+        {label: 'orderNumber', value: 'Mostrar últimos 6 chars em maiúsculo (ex: "247503BB")'},
+        {label: 'Rastreamento', value: 'Link clicável para Melhor Rastreio. Se trackingCode null: "Código será disponibilizado em breve"'},
+        {label: 'Timeline', value: 'Pedido criado → Pagamento → Em produção → Enviado → Entregue. Marcar step atual como ativo'},
+        {label: 'ETA', value: 'Se status=shipped/in_transit: "Entrega prevista em {etaDays} dias úteis"'},
+        {label: 'Itens', value: 'Usar imageUrl (render), NÃO artwork original'},
+      ],
+    },
+    {
+      title: 'Seller',
+      subtitle: '"Studio > Vendas"',
+      tone: 'green',
+      icon: '🎨',
+      rules: [
+        {label: 'Listagem', value: 'GET /orders/seller/me — só pedidos paid (paymentStatus=approved)', emphasis: 'do'},
+        {label: 'Pedidos não pagos', value: 'NÃO mostrar (seller só vê aprovados)', emphasis: 'dont'},
+        {label: 'Badge de status', value: 'fulfillmentStatus (já vem syncado com shipping)'},
+        {label: 'Label fino', value: 'Se fulfillmentStatus=shipped e shipment.status=in_transit: "A caminho" (em vez de "Enviado")'},
+        {label: 'Tracking code', value: 'Mostrar como INFO read-only, NÃO como link (seller não precisa rastrear)'},
+        {label: 'Campo manual de tracking', value: 'REMOVER — tudo vem automático do ME', emphasis: 'dont'},
+        {label: 'Pulos de status', value: 'Se pulou etapa (ex: pending → shipped sem in_production): ícone (!) no step pulado. Acontece no sandbox'},
+        {label: 'Ganhos', value: 'artistEarningsCents disponível em GET /orders/seller/items. Liberação: só após delivered'},
+      ],
+    },
+    {
+      title: 'Admin',
+      subtitle: '"Painel > Pedidos"',
+      tone: 'amber',
+      icon: '⚙️',
+      rules: [
+        {label: 'Listagem', value: 'GET /orders com pipeline counters: Total · Aguardando · Produção · Enviados · Entregues'},
+        {label: 'Aba "Cancelados"', value: 'Separada — filtra paymentStatus=cancelled (inclui expirados)'},
+        {label: 'Campo manual de tracking', value: 'REMOVER — vem automático via polling', emphasis: 'dont'},
+        {label: 'Botão "Marcar Enviado"', value: 'REMOVER — polling sincroniza', emphasis: 'dont'},
+        {label: 'Tracking code', value: 'Read-only. Se existe, mostrar link para Melhor Rastreio'},
+        {label: 'Etiqueta', value: 'Se shipment.labelUrl existe: botão "Imprimir etiqueta" abrindo o PDF'},
+        {label: 'Ação manual restante', value: 'shipment.status=pending + labelUrl existe → imprimir e postar. labelUrl null → verificar logs (erro na pipeline)'},
+        {label: 'Status do envio', value: 'Mostrar shipment.status (pending/shipped/in_transit/delivered) como badge junto ao carrier'},
+      ],
+    },
+  ]}
+/>
+
+## Pedidos expirados (auto-cancel)
+
+- Pedidos com `paymentStatus=pending` criados há mais de **24h** são cancelados automaticamente
+- O cron roda a cada hora, dentro do container `tracking-poller` do `docker-compose.yml`
+- O payment no Asaas também é cancelado se existir
+- **Frontend deve:**
+  - **Customer:** não mostrar cancelled na lista principal (ou aba separada "Cancelados")
+  - **Admin:** aba/filtro separado
+  - **Seller:** nunca mostrar pedidos não-pagos
+
+## Tabela de referência — qual campo usar
+
+| Dado | Campo | Onde usar |
+|---|---|---|
+| Status geral do pedido | `fulfillmentStatus` | Badge principal em todas as views |
+| Status detalhado do envio | `shipment.status` | Info extra quando `shipped` ou adiante |
+| Código de rastreio | `shipment.trackingCode` | Link de rastreio (customer / admin) |
+| Link de rastreio | `https://www.melhorrastreio.com.br/rastreio/{trackingCode}` | Customer e admin |
+| Etiqueta PDF | `shipment.labelUrl` | Botão no admin |
+| Prazo de entrega | `shipment.etaDays` | "Entrega em X dias úteis" (customer) |
+| Transportadora | `shipment.carrier` + `shipment.serviceCode` | Ex: "Correios · SEDEX" |
+| Ganhos do seller | `artistEarningsCents` (via `GET /orders/seller/items`) | Studio do seller |
+| Status do pagamento | `paymentStatus` | Filtros, avisos, listagens |
+| URL de pagamento | `initPoint` | Botão "Pagar agora" em pendentes |

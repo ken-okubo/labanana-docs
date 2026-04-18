@@ -26,20 +26,28 @@
 }
 
 [data-theme='dark'] {
-  --ifm-color-primary: #10b981;
-  --ifm-color-primary-dark: #0ea472;
-  --ifm-color-primary-darker: #0d9b6c;
-  --ifm-color-primary-darkest: #0b8059;
-  --ifm-color-primary-light: #2ec491;
-  --ifm-color-primary-lighter: #36c896;
-  --ifm-color-primary-lightest: #56d3a8;
+  /* Primary — verde menos saturado para descansar os olhos */
+  --ifm-color-primary: #34d399;
+  --ifm-color-primary-dark: #1fc789;
+  --ifm-color-primary-darker: #18bb80;
+  --ifm-color-primary-darkest: #149968;
+  --ifm-color-primary-light: #4fdaa5;
+  --ifm-color-primary-lighter: #5bdcab;
+  --ifm-color-primary-lightest: #7ee2bc;
 
-  --ifm-background-color: #0d1117;
-  --ifm-background-surface-color: #161b22;
-  --ifm-navbar-background-color: #0d1117;
-  --ifm-footer-background-color: #0d1117;
+  /* Backgrounds — preto com leve tom azulado, mais suave que GitHub dark */
+  --ifm-background-color: #171a21;
+  --ifm-background-surface-color: #1f232c;
+  --ifm-navbar-background-color: #20242d;
+  --ifm-footer-background-color: #14171d;
 
-  --docusaurus-highlighted-code-line-bg: rgba(16, 185, 129, 0.15);
+  /* Bordas mais visíveis para definir hierarquia */
+  --ifm-toc-border-color: rgba(255, 255, 255, 0.08);
+  --ifm-color-emphasis-200: rgba(255, 255, 255, 0.1);
+  --ifm-color-emphasis-300: rgba(255, 255, 255, 0.14);
+
+  /* Code highlight mais discreto */
+  --docusaurus-highlighted-code-line-bg: rgba(52, 211, 153, 0.1);
 }
 
 /* Navbar */
@@ -50,7 +58,9 @@
 }
 
 [data-theme='dark'] .navbar {
-  background-color: rgba(13, 17, 23, 0.85);
+  background-color: #2a303c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
 }
 
 .navbar__title {

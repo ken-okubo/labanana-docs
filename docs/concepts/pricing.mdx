@@ -13,9 +13,9 @@ O sistema de preços da Labanana é baseado em três níveis: custo de produçã
 
 ```mermaid
 graph LR
-    PT["ProductType\nfee: 15% · royalty: 20%"]
-    PV["ProductVariant\ncusto: R$ 15,00"]
-    SPV["SellerProductVariant\npreço: R$ 49,90"]
+    PT["ProductType\nfee e royalty\n(configuráveis)"]
+    PV["ProductVariant\ncusto base"]
+    SPV["SellerProductVariant\npreço final"]
 
     PT -->|define taxas| PV
     PV -->|define custo base| SPV
@@ -27,7 +27,11 @@ graph LR
 | ProductVariant | Admin | `baseCostCents` (custo de produção) |
 | SellerProductVariant | Seller | `priceCents` (preço final de venda) |
 
-## Exemplo prático — Caneca a R$ 49,90
+:::info Percentuais são configuráveis **por ProductType**
+`platformFeePercent` e `artistRoyaltyPercent` não são valores globais — cada ProductType tem os seus. Nos exemplos abaixo usamos **15% / 30%** (valores típicos hoje), mas canecas, camisetas e posters podem ter percentuais diferentes conforme a estratégia comercial.
+:::
+
+## Exemplo prático — Caneca a R$ 49,90 (fee 15%, royalty 30%)
 
 <WaterfallChart
   title="Decomposição do preço"
@@ -36,8 +40,8 @@ graph LR
     { label: 'Custo de produção', value: 1500, type: 'subtract', recipient: 'Fornecedor' },
     { label: 'Taxa plataforma (15%)', value: 749, type: 'subtract', recipient: 'Operacional' },
     { label: 'Margem', value: 2741, type: 'subtotal' },
-    { label: 'Royalty artista (20%)', value: 548, type: 'split', recipient: 'Artista', color: '#f59e0b' },
-    { label: 'Lucro Labanana (80%)', value: 2193, type: 'split', recipient: 'Labanana', color: '#10b981' },
+    { label: 'Royalty artista (30%)', value: 822, type: 'split', recipient: 'Artista', color: '#f59e0b' },
+    { label: 'Lucro Labanana (70%)', value: 1919, type: 'split', recipient: 'Labanana', color: '#10b981' },
   ]}
 />
 
@@ -54,10 +58,10 @@ labanana_profit = margem − artist_royalty
 | --- | --- | --- | --- |
 | Preço de venda | — | R$ 49,90 | — |
 | Custo de produção | fixo por variante | - R$ 15,00 | Fornecedor |
-| Taxa plataforma | 4990 x 15% | - R$ 7,49 | Operacional |
+| Taxa plataforma | 4990 × 15% | - R$ 7,49 | Operacional |
 | **Margem** | **4990 - 1500 - 749** | **R$ 27,41** | — |
-| Royalty artista | 2741 x 20% | R$ 5,48 | Artista |
-| Lucro Labanana | 2741 - 548 | R$ 21,93 | Labanana |
+| Royalty artista | 2741 × 30% | R$ 8,22 | Artista |
+| Lucro Labanana | 2741 - 822 | R$ 19,19 | Labanana |
 
 ## Regras
 

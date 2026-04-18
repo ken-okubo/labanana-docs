@@ -22,7 +22,7 @@ graph LR
 
 ---
 
-## Upload da artwork {#upload-da-artwork}
+## Upload da artwork
 
 Use o [fluxo de presign](/docs/flows/image-upload#upload-de-artwork-seller) para fazer upload da arte.
 
@@ -34,7 +34,7 @@ POST /uploads/artworks/{artworkId}/complete        — confirmar e criar registr
 
 ---
 
-## Criar produto {#criar-produto}
+## Criar produto
 
 O SellerProduct é criado **já com pelo menos 1 variante**.
 
@@ -123,7 +123,7 @@ Mesma lógica, mas inclui `sellerProfileId` no body.
 
 ---
 
-## Renders {#renders}
+## Renders
 
 ### Conceito
 
@@ -156,7 +156,7 @@ Todas as coordenadas são em **pixels do sourceImage**, com referência no **can
 | `scale` | multiplicador | `1.0` = tamanho original, `0.5` = metade |
 | `rotation` | graus | Sentido horário. `0` = sem rotação |
 
-### Pré-visualização (sem salvar) {#preview}
+### Pré-visualização (sem salvar)
 
 ```http
 POST /products/templates/{templateId}/preview-placement
@@ -177,11 +177,12 @@ Retorna **imagem PNG diretamente**. Headers de resposta indicam fit:
 | Header | Descrição |
 |---|---|
 | `X-Fits-Within-Print-Area` | `true` ou `false` |
-| `X-Overflow-Top/Right/Bottom/Left` | Overflow em pixels |
+| `X-Overflow-Top/Right/Bottom/Left` | Overflow em pixels por direção |
+| `X-Bleed-Tolerance` | Tolerância aceita em pixels (ex: `{"width": 4, "height": 4}`) |
 | `X-Artwork-Bounds` | Bounding box da arte (JSON) |
 | `X-Print-Area-Bounds` | Retângulo da printArea (JSON) |
 
-### Disparar render {#gerar-render}
+### Disparar render
 
 ```http
 POST /seller-products/me/{sellerProductId}/render
@@ -199,19 +200,35 @@ POST /seller-products/me/{sellerProductId}/render
 
 **O que acontece:**
 1. Valida que o template existe
-2. Valida que a arte cabe na printArea (tolerância de 5% de sangria)
+2. Valida que a arte cabe na printArea (tolerância de 5% de sangria). Se não cabe, retorna **400** com detalhes do overflow em pixels por lado
 3. Cria/atualiza o placement
 4. Gera o mockup (compõe arte + layers)
 5. Salva no S3 como WebP
-6. Retorna o produto com todos os renders
+6. Cria/atualiza o registro de **Render** no banco
+7. Retorna o produto com todos os renders
 
 :::tip Consistência
 O preview-placement e o render usam **exatamente a mesma função** de validação. Se o preview aprova, o render aceita.
 :::
 
+:::warning `PUT /artworks/.../placements/{templateId}` NÃO dispara re-render
+Atualizar o placement via `PUT` só atualiza os valores de posicionamento no banco. Para gerar a imagem com o novo posicionamento, chame **`POST /seller-products/me/{sellerProductId}/render`** novamente.
+:::
+
+#### Endpoints alternativos de render (via artwork)
+
+Quando você quer gerar render **sem** passar pelo SellerProduct (ex: admin gerando render direto da artwork):
+
+```
+POST /artworks/{artworkId}/renders        — 1 template
+POST /artworks/{artworkId}/renders/batch  — vários templates de uma vez
+```
+
+Estes retornam a lista de renders gerados (não o produto inteiro). **Placement é por `(artwork, template)`** — não por variante — então um mesmo render pode aparecer em múltiplas variantes cujo template casa por subset.
+
 ---
 
-## Publicar {#publicar}
+## Publicar
 
 O produto é criado com status `draft`. Para publicar:
 
@@ -259,10 +276,19 @@ PATCH  /artworks/{artworkId}                         — atualizar
 DELETE /artworks/{artworkId}                         — desativar
 GET    /artworks/check-slug?slug=minha-arte          — verificar slug
 GET    /artworks/{artworkId}/placements              — listar placements
-PUT    /artworks/{artworkId}/placements/{templateId} — criar/atualizar placement
+PUT    /artworks/{artworkId}/placements/{templateId} — criar/atualizar placement (NÃO dispara render)
 GET    /artworks/{artworkId}/renders                 — listar renders
 POST   /artworks/{artworkId}/renders                 — gerar render (1 template)
 POST   /artworks/{artworkId}/renders/batch           — gerar renders (vários)
+```
+
+**Públicos (sem autenticação):**
+
+```
+GET /artworks/public/{artworkId}                   — detalhes da arte
+GET /artworks/public/by-slug/{artistSlug}/{slug}   — por slug
+GET /artworks/public/{artworkId}/products          — produtos usando essa arte
+GET /artworks/public/related/artist/{artistSlug}   — artes relacionadas do artista
 ```
 
 ### Seller Product
@@ -278,5 +304,6 @@ DELETE /seller-products/me/{id}/variants/{variantId}                — desativa
 POST   /seller-products/me/{id}/variants/generate-skus             — gerar SKUs
 POST   /seller-products/me/{id}/render                             — render template
 GET    /seller-products/me/{id}/preview                            — preview página pública
-DELETE /seller-products/me/{id}                                    — arquivar
+DELETE /seller-products/me/{id}                                    — arquivar (soft delete)
+DELETE /seller-products/admin/{sellerProductId}                    — deletar permanentemente (admin only)
 ```

@@ -113,11 +113,6 @@ const config: Config = {
             },
           ],
         },
-        {
-          href: 'https://github.com/ken-okubo/labanana-docs',
-          label: 'GitHub',
-          position: 'right',
-        },
       ],
     },
     footer: {

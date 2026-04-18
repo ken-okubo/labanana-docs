@@ -35,9 +35,13 @@ POST /products/types
   "name": "Caneca Cerâmica",
   "description": "Caneca de cerâmica personalizada",
   "platformFeePercent": 15,
-  "artistRoyaltyPercent": 20
+  "artistRoyaltyPercent": 30
 }
 ```
+
+:::info `platformFeePercent` e `artistRoyaltyPercent` são configuráveis por ProductType
+Valores típicos hoje são `15` (taxa plataforma) e `30` (royalty artista), mas cada ProductType pode ter os seus. Ver [Modelo de Preços](/docs/concepts/pricing).
+:::
 
 ## 2. Adicionar Assets
 
@@ -124,7 +128,7 @@ POST /products/types/{product_type_id}/templates
 }
 ```
 
-Depois, faça o upload da imagem base via [fluxo de presign](/docs/flows/image-upload).
+Depois, faça o upload da imagem base via [fluxo de presign](/docs/flows/image-upload) (3 etapas: presign → PUT no S3 → complete). O template é **ativado automaticamente** quando a imagem `base` é completada.
 
 ---
 

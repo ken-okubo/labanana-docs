@@ -102,37 +102,65 @@ Option "side" (inputType: radio, displayBehavior: show_all)
 
 Todos os deletes são **soft delete** (`is_active = false`). A desativação **não é automática em cascata**.
 
-### Desativar um Asset
+### Desativar um Asset (ex: `size=350ml`)
 
 | Recurso afetado | O que acontece | Automático? |
 | --- | --- | --- |
 | **ProductVariant** com esse asset | Continua existindo, mas não deveria ser vendida | Não — admin desativa manualmente |
 | **Template** com esse asset | Continua existindo, mas não deveria ser usado | Não — admin desativa manualmente |
+| **SellerProductVariant** vinculada | Continua existindo, mas venda deveria ser bloqueada | Não — admin deve agir |
 
 :::info
-Desativar um asset é raro (parar de fabricar um tamanho). O admin deve desativar a variant e os templates associados.
+Desativar um asset é raro (parar de fabricar um tamanho). O admin deve desativar a variant, os templates e os SKUs dos sellers que a usam. **Pedidos existentes não são afetados** (têm snapshot de preços).
 :::
 
-### Desativar uma Option
+### Desativar uma Option (ex: `color`)
 
 | Recurso afetado | O que acontece | Automático? |
 | --- | --- | --- |
 | **ProductVariant** | Nenhum impacto — variants não têm options | — |
-| **Template** com essa option | A API filtra options inativas ao retornar dados públicos | Sim |
+| **Template** com essa option | A API filtra options inativas ao retornar dados públicos | Sim (filtra na resposta) |
+| **SellerProductVariant** com `allowedOptions` usando essa key | A option some do seletor do cliente | Sim (filtra na resposta) |
+
+:::warning Filtra na resposta, **não** limpa o banco
+O backend filtra options inativas ao retornar dados públicos, mas **não limpa** o campo `allowedOptions` do `SellerProductVariant` no banco. Se você reativar a option depois, ela volta a aparecer. Se você migrar/exportar dados, pode ver valores órfãos.
+:::
 
 :::tip
-Desativar uma option é mais seguro — como options não afetam fabricação nem preço, o impacto é apenas visual.
+Desativar uma option é mais seguro que desativar um asset — como options não afetam fabricação nem preço, o impacto é apenas visual.
 :::
+
+### Desativar um Option Value (ex: `color=red`)
+
+| Recurso afetado | O que acontece | Automático? |
+| --- | --- | --- |
+| **Seletor no frontend** | Value `red` desaparece das opções do cliente | Sim |
+| **Template** com `options: { color: "red" }` | **Não aparece mais** ao selecionar `red` (fica efetivamente invisível) | Sim |
+
+### Desativar uma Variant
+
+| Recurso afetado | O que acontece |
+| --- | --- |
+| **SellerProductVariant** que referencia | Continua existindo, mas venda deveria ser bloqueada |
+| **Template** | Continua existindo (sem relação direta com a variant) |
+| **Pedidos em andamento** | **Não são cancelados** — o pedido tem snapshot completo |
+
+### Desativar um ProductType
+
+| Recurso afetado | O que acontece |
+| --- | --- |
+| **SellerProducts existentes** | Continuam visíveis nas lojas dos sellers |
+| **Novos seller products** | API **impede** criação |
 
 ### Resumo de desativação
 
 | Recurso desativado | Impacto em cascata |
 | --- | --- |
-| Asset | Nenhum automático — admin desativa variants/templates manualmente |
-| Option | API filtra automaticamente nos endpoints públicos |
-| Option Value | Value desaparece do seletor, templates não afetados |
-| Variant | API bloqueia criação de novas vendas |
-| ProductType | API impede criação de novos seller products |
+| Asset | Nenhum automático — admin desativa variants/templates/SKUs manualmente |
+| Option | API filtra na resposta, mas **não limpa** `allowedOptions` no banco |
+| Option Value | Some do seletor; templates usando esse value ficam invisíveis |
+| Variant | API bloqueia criação de novas vendas; pedidos existentes intactos |
+| ProductType | API impede criação de novos seller products; existentes continuam |
 
 ---
 

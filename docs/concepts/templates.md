@@ -105,6 +105,40 @@ Template "caneca-350ml-preta-lateral-v1"
 
 O comprador seleciona `color: black` → galeria mostra **ambas** as imagens (frente e lateral).
 
+## Ativação automática
+
+`isActive` é **`false` por default** na criação do template. Ele é ativado automaticamente quando a imagem `base` é **completada** (etapa 3 do [fluxo de presign](/docs/flows/image-upload)).
+
+:::info Templates sem imagem base não aparecem na loja
+Se você criou o template mas esqueceu de subir a imagem base, ele fica invisível. Verifique via `GET /products/templates/admin/all`.
+:::
+
+## `config.printArea` e `sourceImage`
+
+Definem **onde** a arte é posicionada dentro do mockup:
+
+```json
+{
+  "config": {
+    "sourceImage": { "width": 1200, "height": 1600 },
+    "printArea":   { "x": 500, "y": 674, "width": 200, "height": 252 }
+  }
+}
+```
+
+- **`sourceImage`** — dimensão da imagem base (pixels).
+- **`printArea`** — retângulo onde a arte é aplicada, coordenadas em pixels relativos à imagem base (origem no canto superior esquerdo).
+
+Todas as coordenadas no sistema de placement são em **pixels absolutos** — facilita integração com ferramentas visuais (Figma, Photoshop).
+
+## Endpoints de preview e debug (admin)
+
+| Endpoint | O que faz |
+|---|---|
+| `GET /products/templates/{id}/preview` | Retorna PNG do mockup com `printArea` desenhada em **verde** — útil para ver onde a arte vai cair |
+| `POST /products/templates/{id}/preview-placement` | Envia arte + placement, retorna PNG com validação de fit. Response inclui headers `X-Fits-Within-Print-Area`, `X-Overflow-*`, `X-Bleed-Tolerance` |
+| `POST /products/templates/{id}/test-render` | Gera um render de teste sem persistir — útil para calibrar placements |
+
 ## Por que o ID é texto?
 
 O template usa um **ID semântico legível** (ex: `caneca-350ml-black-v1`) em vez de UUID:
@@ -119,7 +153,7 @@ Se não enviar `id`, é auto-gerado a partir do `displayName`.
 
 ```mermaid
 graph TD
-    PT["ProductType<br/>Caneca Cerâmica<br/>fee: 15%, royalty: 20%"]
+    PT["ProductType<br/>Caneca Cerâmica<br/>fee e royalty configuráveis"]
 
     PT --> Assets
     PT --> Options

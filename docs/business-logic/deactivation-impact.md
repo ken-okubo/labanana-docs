@@ -23,7 +23,11 @@ Pedidos existentes **nunca** são afetados por nenhuma operação de delete/inat
 - Variants existentes **continuam ativas** — não são desativadas automaticamente
 
 :::warning Mensagem para o frontend
-"Desativar este asset irá removê-lo das opções visíveis na loja. Variantes e templates existentes que usam este valor continuarão funcionando, mas não poderão ser recriados."
+"Desativar este asset irá removê-lo das opções visíveis na loja. Variantes e templates existentes que usam este valor continuarão funcionando, mas não poderão ser recriados. Pedidos existentes não são afetados."
+:::
+
+:::danger Hard delete (admin)
+Deletar um asset permanentemente deixa **valores JSONB órfãos** em `ProductVariant.assets` e `Template.assets` — a referência continua, mas a definição deixa de existir. Evite; prefira sempre desativar (soft delete).
 :::
 
 ---
@@ -95,6 +99,10 @@ Deleta **todos** os renders do artwork, mesmo que ele seja usado em outro produt
 "Arquivar este produto irá removê-lo da loja. Pode ser reativado a qualquer momento. Pedidos existentes não são afetados."
 :::
 
+:::danger Hard delete (admin) — mensagem para o frontend
+"⚠️ ATENÇÃO: Deletar permanentemente este produto irá remover todos os dados associados (variantes, imagens, renders). Se o artwork for usado em outro produto, os renders desse outro produto também serão perdidos. Esta ação não pode ser desfeita."
+:::
+
 ---
 
 ## SellerProductVariant (SKU do Seller)
@@ -105,16 +113,21 @@ Deleta **todos** os renders do artwork, mesmo que ele seja usado em outro produt
 - Faixa de preço (`minPrice`/`maxPrice`) é recalculada automaticamente
 - Renders são compartilhados por template, não por variant — permanecem
 
+:::warning Mensagem para o frontend
+"Deletar este SKU irá removê-lo permanentemente da loja. Pedidos já realizados com este SKU não são afetados."
+:::
+
 ---
 
 ## Resumo de Segurança
 
 | Entidade | Pedidos OK? | Cascade Auto? | Risco Principal |
 |---|---|---|---|
-| Asset | Sim | Nao | JSONB orfao em variants |
-| Option/Value | Sim | Nao | Opcao some da UI silenciosamente |
-| ProductVariant | Sim | Nao | Seller continua vendendo |
-| Template | Sim | Nao | SKUs ficam sem imagem |
-| SellerProduct (archive) | Sim | Nao | Pode ser reativado |
-| SellerProduct (hard delete) | Sim | Parcial | Render loss cross-product |
-| SellerProductVariant | Sim | Nao | Minimo -- preco recalcula |
+| Asset (soft) | ✅ | ❌ | JSONB órfão em variants |
+| Asset (hard delete) | ✅ | ❌ | Definição some — variants ficam com valor órfão |
+| Option/Value | ✅ | ❌ | Não limpa `allowedOptions` dos sellers |
+| ProductVariant | ✅ | ❌ | Sellers continuam vendendo |
+| Template | ✅ | ❌ | SKUs ficam sem imagem |
+| SellerProduct (archive) | ✅ | ❌ | Variants ficam ativas; pode ser reativado |
+| SellerProduct (hard delete) | ✅ | ⚠️ Parcial | Render loss cross-product |
+| SellerProductVariant | ✅ | ❌ | Mínimo — preço recalcula |

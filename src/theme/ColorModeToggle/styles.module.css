@@ -1,0 +1,111 @@
+.toggle {
+  display: flex;
+  align-items: center;
+  margin: 0 0.25rem;
+}
+
+.button {
+  position: relative;
+  width: 64px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='light'] .button {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.button:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18);
+}
+
+.button:active {
+  transform: scale(0.96);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+/* Backgrounds — sobrepostos, fazem crossfade */
+.bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  transition: opacity 0.55s ease;
+}
+
+/* Default (light mode): dia visível, noite escondida */
+.bgDay {
+  opacity: 1;
+}
+.bgNight {
+  opacity: 0;
+}
+
+/* Dark mode: inverte */
+.button.isDark .bgDay {
+  opacity: 0;
+}
+.button.isDark .bgNight {
+  opacity: 1;
+}
+
+/* Astro — container que desliza e gira */
+.astro {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  top: 3px;
+  left: 39px; /* posição do SOL (direita) no modo light */
+  transition:
+    left 0.65s cubic-bezier(0.4, 0.0, 0.2, 1),
+    transform 0.65s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transform: rotate(0deg);
+  will-change: left, transform;
+}
+
+/* Dark mode: astro desliza para a esquerda (posição da LUA) e "rola" +360° */
+.button.isDark .astro {
+  left: 3px;
+  transform: rotate(360deg);
+}
+
+/* Lua e sol sobrepostos dentro do container do astro */
+.orb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+/* Default (light): sol visível, lua escondida */
+.orbSun {
+  opacity: 1;
+}
+.orbMoon {
+  opacity: 0;
+}
+
+/* Dark: inverte */
+.button.isDark .orbSun {
+  opacity: 0;
+}
+.button.isDark .orbMoon {
+  opacity: 1;
+}

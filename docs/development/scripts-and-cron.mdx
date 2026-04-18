@@ -1,0 +1,117 @@
+---
+sidebar_position: 2
+title: Scripts e Cron
+---
+
+# Scripts e Cron
+
+Scripts standalone e serviços cron do docker-compose. Úteis para ops, dev e troubleshooting.
+
+## Serviços com cron
+
+Ambos rodam dentro do container `tracking-poller` do `docker-compose.yml`.
+
+### `scripts/poll_tracking.py`
+
+**Quando:** a cada **30 min**
+
+**O que faz** (passo a passo):
+
+1. Busca todos os `OrderShipment` ativos (status ∉ `delivered`/`returned` e `provider_order_id` não nulo)
+2. Chama Melhor Envio `/me/shipment/tracking` em batch
+3. Mapeia status ME → `ShipmentStatus` interno
+4. Atualiza `shipment.status`, `tracking_code`, `delivered_at` / `shipped_at`
+5. Cascata para `OrderItem.fulfillment_status` → `Order.fulfillment_status` → release de `SellerPayoutItem` quando `delivered`
+
+**Manual:**
+
+```bash
+# Dentro do container web
+docker-compose exec web python -m scripts.poll_tracking
+
+# Ou via endpoint admin (dispara polling imediato)
+curl -X POST https://api.labanana.art/shipping/poll-tracking \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+**Saída (log):**
+
+```
+INFO scripts.poll_tracking: Done: 12 shipments checked, 3 updated, 0 errors
+```
+
+**Pré-requisito:** `MELHOR_ENVIO_TOKEN` configurado no `.env`. Sai com erro caso contrário.
+
+Ver também: [Tracking Polling](/docs/integrations/shipping-melhor-envio#4-tracking-polling-estratégia-principal).
+
+### `scripts/cancel_expired_orders.py`
+
+**Quando:** a cada **~60 min** (segundo tick do mesmo loop do `tracking-poller`)
+
+**O que faz** (passo a passo):
+
+1. Busca orders com `payment_status=pending` e `created_at > 24h`
+2. Para cada uma, tenta cancelar o pagamento no Asaas (**best-effort** — se falhar, continua)
+3. Marca a ordem como `cancelled`
+
+**Config:** constante `EXPIRY_HOURS=24` **hardcoded** no script — não é env-configurável hoje.
+
+**Manual:**
+
+```bash
+docker-compose exec web python -m scripts.cancel_expired_orders
+```
+
+**Saída (log):**
+
+```
+INFO scripts.cancel_expired_orders: Found 3 expired pending orders (>24h)
+INFO scripts.cancel_expired_orders: Cancelled order #1042
+INFO scripts.cancel_expired_orders: Done: 3 cancelled, 0 errors
+```
+
+## Scripts utilitários
+
+| Script | Uso |
+|---|---|
+| `create_admin.py` | Cria admin interativamente — **obrigatório na primeira instalação** |
+| `seed_products.py` | Popula 1 ProductType completo (dev/demo) |
+| `seed_templates.py` | Popula templates |
+| `cleanup_all.py` | **Wipe DB+S3** (preserva users/profiles/stores). Flags: `--dry-run`, `--db-only`, `--s3-only`, `-y` |
+| `check_template_config.py` | Valida o JSON de config de um template |
+| `generate_artwork_previews.py` | Re-gera os previews dos artworks |
+
+:::danger `cleanup_all.py` é destrutivo
+Sempre rode com `--dry-run` primeiro. A flag `-y` pula a confirmação — **use só em CI/ambientes descartáveis**. Em produção, este script **não deve ser executado** em hipótese alguma.
+:::
+
+### Primeira instalação — create_admin
+
+Após subir o stack local, crie o admin inicial:
+
+```bash
+docker-compose exec web python -m scripts.create_admin
+```
+
+Pede email, senha e nome interativamente. Sem admin criado, a maioria dos endpoints administrativos (waitlist, users, payouts) fica inacessível.
+
+## Sobre o "cron"
+
+:::warning Não é `cron(8)` real
+O serviço `tracking-poller` é um **shell loop** com `sleep 1800`, não um cron do sistema.
+
+**Consequência:** se o container reinicia no meio do sleep, o relógio reseta — pode levar até 30min para o próximo tick. Não há backoff nem retry granular.
+
+**Quando considerar migrar:** pós-MVP, avaliar Celery (com Redis/RabbitMQ) ou APScheduler para scheduling mais robusto e timers menores que 30min.
+:::
+
+## Endpoint admin para trigger manual
+
+| Endpoint | Efeito |
+|---|---|
+| `POST /shipping/poll-tracking` | Força polling imediato sem esperar os 30min |
+
+Útil para:
+- Testar integração com ME em dev
+- Debug (ver se o poller detecta um shipment específico)
+- Admin precisa atualizar status rapidamente

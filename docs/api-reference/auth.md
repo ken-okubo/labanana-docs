@@ -59,6 +59,36 @@ O usuário é criado com role `customer` e já recebe tokens para uso imediato.
 
 ---
 
+## Signup de Seller (via convite)
+
+```http
+POST /auth/signup/seller
+```
+
+Usado apenas para completar cadastro de seller **convidado** via waitlist. O artista recebe um `inviteToken` por email/WhatsApp e finaliza o cadastro definindo a senha.
+
+```json
+{
+  "token": "a1b2c3...hex",
+  "password": "minimo8chars"
+}
+```
+
+**Comportamento:**
+
+1. Valida o token (não expirado + waitlist com `status = invited`)
+2. Cria `User` com `role=seller`
+3. Cria `SellerProfile` (`onboarding_status=pending`, `storeStatus=unpublished`)
+4. Muda waitlist para `status=converted`, grava `user_id` e `convertedAt`
+
+Response: mesmos access + refresh tokens do signup público.
+
+:::info Fluxo completo
+Para o fluxo end-to-end (waitlist → invite → signup), ver [Onboarding do Seller](/docs/flows/seller-onboarding).
+:::
+
+---
+
 ## Login
 
 ```http
@@ -126,6 +156,49 @@ Requer `Authorization: Bearer <accessToken>`.
 ```
 
 </details>
+
+---
+
+## Atualizar Perfil
+
+```http
+PATCH /users/me
+```
+
+Atualiza dados do usuário autenticado. Todos os campos são **opcionais** — envie apenas o que deseja alterar.
+
+```json
+{
+  "name": "Ken Okubo",
+  "documentType": "cpf",
+  "documentNumber": "123.456.789-09"
+}
+```
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `name` | string | Nome (1-150 chars) |
+| `documentType` | string | `cpf`, `cnpj` ou `passport` |
+| `documentNumber` | string | Número do documento (aceita com pontuação) |
+
+**Validações:**
+
+- `documentType` é **obrigatório quando `documentNumber` é enviado**
+- CPF: 11 dígitos, validado com dígitos verificadores
+- CNPJ: 14 dígitos, validado com dígitos verificadores
+- Pontuação (`.`, `-`, `/`) é removida automaticamente
+- `status` **não** pode ser alterado pelo próprio usuário
+
+:::danger CPF/CNPJ é obrigatório para checkout
+O **Asaas** (gateway de pagamento) exige CPF/CNPJ para criar o customer. Se o usuário não tem `documentNumber`, o `POST /orders` retorna erro.
+
+**Fluxo recomendado no frontend:**
+1. Antes de abrir o checkout, checar `GET /auth/me` — o usuário tem `documentNumber`?
+2. Se **não**, coletar no formulário de checkout e chamar `PATCH /users/me` antes de criar o pedido
+3. Se **sim**, seguir direto para `POST /orders`
+:::
+
+Response `200` retorna o `UserResponse` atualizado.
 
 ---
 

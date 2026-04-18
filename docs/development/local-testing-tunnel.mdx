@@ -1,0 +1,225 @@
+---
+sidebar_position: 1
+title: Testes Locais com Tunnel
+---
+
+# Testes Locais com Cloudflare Tunnel
+
+Guia para rodar webhooks de Asaas e Melhor Envio **localmente**, usando Cloudflare Tunnel para expor a API do ambiente de dev.
+
+:::info Por que precisa de tunnel
+O Asaas (e opcionalmente o ME) envia webhooks via HTTP POST para uma URL pública. Como `localhost:8000` não é acessível da internet, usamos Cloudflare Tunnel para expor o backend local via `https://localapi.labanana.art`.
+:::
+
+## Setup (uma vez)
+
+### 1. Cloudflare Dashboard
+
+1. Acesse [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**
+2. Crie tunnel `labanana-local`
+3. Configure rota: `localapi.labanana.art` → `http://web:8000` (tipo HTTP)
+4. Copie o token gerado
+
+### 2. Configure `.env`
+
+```env
+CLOUDFLARE_TUNNEL_TOKEN=<token-copiado>
+TUNNEL_URL=https://localapi.labanana.art
+```
+
+### 3. Docker Compose
+
+O serviço `tunnel` já está configurado no `docker-compose.yml`:
+
+```yaml
+tunnel:
+  image: cloudflare/cloudflared:latest
+  command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+  depends_on:
+    - web
+  networks:
+    - app-network
+  restart: unless-stopped
+```
+
+### 4. Subir os serviços
+
+```bash
+docker compose down && docker compose up --build -d
+```
+
+### 5. Verificar o tunnel
+
+```bash
+curl https://localapi.labanana.art/health
+# Deve retornar: {"status": "ok"}
+```
+
+Se retornar 502/504, o tunnel está fora do ar — ver `docker compose logs tunnel`.
+
+## Teste End-to-End de Pagamento
+
+### Pré-requisitos
+
+- Conta Asaas sandbox com `ASAAS_API_KEY` configurada no `.env`
+- Tunnel funcionando (verificado com `/health`)
+- Pelo menos 1 SellerProduct ativo com variant ativa
+- User com `documentType` + `documentNumber` preenchidos
+
+### Passo 1 — Autenticação
+
+```bash
+# Signup com documento (ou login se já tem conta)
+curl -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "teste@email.com",
+    "password": "senha123",
+    "name": "Teste Silva",
+    "documentType": "cpf",
+    "documentNumber": "529.982.247-25"
+  }'
+
+TOKEN="<accessToken-do-response>"
+```
+
+### Passo 2 — Criar pedido (já retorna `initPoint`)
+
+```bash
+curl -X POST http://localhost:8000/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shipping": {
+      "cep": "01310100",
+      "street": "Av Paulista",
+      "number": "1000",
+      "neighborhood": "Bela Vista",
+      "city": "São Paulo",
+      "state": "SP"
+    },
+    "items": [
+      {
+        "sellerProductId": "<uuid-do-seller-product>",
+        "variantId": "<uuid-da-variant>",
+        "quantity": 1,
+        "selectedOptions": { "color": "black" }
+      }
+    ],
+    "shippingCents": 1590
+  }'
+
+# Response inclui:
+# - "id": "uuid-da-order"
+# - "initPoint": "https://sandbox.asaas.com/i/pay_xxxx"
+# - "payment": { "status": "pending", "paymentProvider": "asaas" }
+
+ORDER_ID="<id-do-response>"
+INIT_POINT="<initPoint-do-response>"
+```
+
+### Passo 3 — Pagar no sandbox
+
+1. Abra o `INIT_POINT` no browser
+2. O Asaas sandbox mostra Pix, cartão e boleto
+3. Pague com qualquer método — o sandbox aceita pagamentos de teste
+
+### Passo 4 — Verificar webhook
+
+```bash
+docker compose logs web --tail=20
+
+# Deve mostrar:
+# Asaas webhook received: PAYMENT_RECEIVED - payment pay_xxxx
+# Payment pay_xxxx: Asaas status 'RECEIVED' -> our status 'approved'
+# Updated order xxx payment to status: approved
+```
+
+### Passo 5 — Confirmar status
+
+```bash
+curl http://localhost:8000/orders/$ORDER_ID \
+  -H "Authorization: Bearer $TOKEN"
+
+# paymentStatus deve ser "approved"
+# paidAt deve estar preenchido
+```
+
+## Teste com `dev-pay` (fallback sem Asaas)
+
+Se quiser testar rápido sem tunnel nem Asaas:
+
+```bash
+curl -X POST http://localhost:8000/orders/$ORDER_ID/dev-pay \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+:::warning Só funciona em dev
+`dev-pay` só é aceito em `ENVIRONMENT=dev/development/local`. Em produção retorna `403`.
+:::
+
+## Teste de reembolso
+
+```bash
+# Refund total:
+curl -X POST http://localhost:8000/orders/$ORDER_ID/refund \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# Refund parcial:
+curl -X POST http://localhost:8000/orders/$ORDER_ID/refund \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amountCents": 2800}'
+```
+
+Ver [`/orders/{id}/refund`](/docs/api-reference/orders#7-reembolsar-pedido-admin) para regras de comportamento.
+
+## Teste de cancelamento
+
+```bash
+# Cancela pedido pendente (cancela cobrança no Asaas):
+curl -X POST http://localhost:8000/orders/$ORDER_ID/cancel \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# Cancela pedido aprovado (emite refund total automático):
+curl -X POST http://localhost:8000/orders/$ORDER_ID/cancel \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+## Teste de Melhor Envio
+
+O ME usa polling em vez de webhook como fonte de verdade. Para testar manualmente:
+
+```bash
+# Trigger do polling (admin):
+curl -X POST http://localhost:8000/shipping/poll-tracking \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# Response mostra total/updated/errors com detalhe por shipment
+```
+
+Para ver o poller automático:
+
+```bash
+docker compose logs -f tracking-poller
+```
+
+Ver [Tracking Polling](/docs/integrations/shipping-melhor-envio#4-tracking-polling-estratégia-principal) para contexto.
+
+## Troubleshooting
+
+| Problema | Causa | Solução |
+|---|---|---|
+| Webhook não chega | Tunnel fora do ar | `docker compose logs tunnel` — verificar conexão |
+| `Document is required` | User sem CPF/CNPJ | Fazer `PATCH /users/me` com `documentType` + `documentNumber` |
+| `Failed to create payment` | API key inválida ou vazia | Verificar `ASAAS_API_KEY` no `.env` |
+| CORS error no frontend | Backend retornando 500 | `docker compose logs web` — o erro real está lá |
+| `dev-pay` retorna 403 | `ENVIRONMENT` não é dev | Verificar `.env` |
+| App não inicia em prod | API key vazia | Guardrail: prod requer `ASAAS_API_KEY` configurado |
+| Warnings de `$` no docker-compose | API key do Asaas contém `$` | Inofensivo — pydantic lê o `.env` diretamente |
+| Etiqueta ME não gerou | Saldo ME ou dados incompletos | Ver logs e saldo no painel ME |
+| `trackingCode` null após pipeline | ME não atribui imediatamente | Rodar `POST /shipping/poll-tracking` ou aguardar cron (30min) |
+
+:::info Sandbox Asaas é estável
+Pix e cartão funcionam normalmente em ambiente de teste. O sandbox retorna status realistas (`RECEIVED`, `REFUNDED`, etc.) em segundos.
+:::

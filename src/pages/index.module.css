@@ -7,7 +7,7 @@
 }
 
 [data-theme='dark'] .heroBanner {
-  background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a1e24 100%);
+  background: linear-gradient(135deg, #171a21 0%, #1f232c 50%, #252a35 100%);
 }
 
 [data-theme='light'] .heroBanner {
@@ -116,4 +116,20 @@
   font-weight: 600;
   color: var(--ifm-color-primary);
   margin-top: 0.75rem;
+}
+
+.faqInlineLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-600);
+  text-decoration: none !important;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
+  padding-bottom: 2px;
+}
+
+.faqInlineLink:hover {
+  color: var(--ifm-color-primary);
+  border-bottom-color: var(--ifm-color-primary);
 }

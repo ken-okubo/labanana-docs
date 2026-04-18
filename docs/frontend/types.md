@@ -106,13 +106,24 @@ interface SellerProductVariant {
 }
 ```
 
-## SKU Render (público)
+## SKU Render
+
+Existe uma variante **pública** (storefront) e uma **do seller** (dashboard). O frontend deve usar apenas a pública.
 
 ```typescript
+// Público — retornado em GET /stores/{slug}/products/{slug}
 interface SkuRender {
   templateId: string;                          // ex: "caneca-350ml-black-v1"
   url: string;                                 // URL do render no CDN
   options: Record<string, string> | null;      // options do template, null = genérico
+}
+
+// Seller dashboard — inclui placement para edição
+interface SellerSkuRender extends SkuRender {
+  placementX: number;          // coordenadas absolutas em pixels
+  placementY: number;
+  placementScale: number;      // 1.0 = tamanho original
+  placementRotation: number;   // graus
 }
 ```
 
@@ -134,36 +145,63 @@ interface OptionDefinition {
   values: { value: string; label: string; hexColor?: string }[];
 }
 
-interface StoreProduct {
+interface StoreProductStore {
+  storeName: string;
+  storeSlug: string;
+  displayName?: string;
+  avatarUrl?: string;
+  isFollowing: boolean | null;  // null = visitante anônimo
+}
+
+interface StoreProductArtwork {
+  id: string;
+  title: string;
+  previewUrl?: string;
+  dominantColor?: string;       // hex — usado em fallback de fundo
+}
+
+interface StoreProductImage {
+  url: string;
+  altText?: string;
+  isPrimary: boolean;
+}
+
+interface RelatedProducts {
+  sameArtwork: StoreProductResponse[];   // até 12
+  sameArtist: StoreProductResponse[];    // até 12
+  recommended: StoreProductResponse[];   // até 12
+}
+
+interface StoreProductResponse {
   id: string;
   title: string;
   description?: string;
   slug: string;
+  tags: string[];
+  backgroundColor?: string;
+
   productTypeId: string;
   productTypeName: string;
+  productTypeSlug: string;
+
   assetDefinitions: AssetDefinition[];
   optionDefinitions: OptionDefinition[];
   skus: SellerProductVariant[];
+
   minPriceCents?: number;
   maxPriceCents?: number;
-  store: { storeName: string; storeSlug: string };
-  artwork: { id: string; title: string; previewUrl?: string };
-  images: { url: string; altText?: string; isPrimary: boolean }[];
+
+  store: StoreProductStore;
+  artwork: StoreProductArtwork;
+  images: StoreProductImage[];
+
+  likesCount: number;
+  isLiked: boolean | null;       // null = visitante anônimo
+
+  relatedProducts?: RelatedProducts;   // só no endpoint de detalhe, não na listagem
 }
 ```
 
-## Related Products
-
-```typescript
-interface RelatedProductCard {
-  id: string;
-  title: string;
-  slug: string | null;
-  minPriceCents: number | null;
-  thumbnailUrl: string | null;
-  productTypeName: string;
-  productTypeSlug: string;
-  storeSlug: string;
-  artistName: string;
-}
-```
+:::info Related products = `StoreProductResponse` completo
+Cada item em `sameArtwork[]`, `sameArtist[]` e `recommended[]` retorna **o mesmo formato** da response principal — com SKUs, renders, store, artwork, etc. Isso permite renderizar mockups reais nos cards do carousel (sem chamadas adicionais).
+:::
